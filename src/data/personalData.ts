@@ -43,6 +43,7 @@ export const PERSONAL_INFO = {
     artist: "The Weeknd",
     youtubeId: "sI3FS119zNI",
     youtubeUrl: "https://youtu.be/sI3FS119zNI?si=zWrFaispcuN1YGyH",
+    audioSrc: "/audio/after-hours.mp3",
     tempo: "109 BPM",
     mood: "Late Night Noir • Melancholic Drive • Cinematic Heartbreak"
   }

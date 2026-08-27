@@ -52,7 +52,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     filter?: BiquadFilterNode;
     intervalId?: any;
   }>({});
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
   // Detect Instagram, Facebook, TikTok in-app webview
   useEffect(() => {
@@ -62,23 +62,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setIsInstagramBrowser(isIAB);
     }
   }, []);
-
-  const sendIframeCommand = (func: string, args: any = '') => {
-    if (iframeRef.current && iframeRef.current.contentWindow) {
-      try {
-        iframeRef.current.contentWindow.postMessage(
-          JSON.stringify({
-            event: 'command',
-            func: func,
-            args: Array.isArray(args) ? args : [args]
-          }),
-          '*'
-        );
-      } catch {
-        // Fallback safe
-      }
-    }
-  };
 
   const initWebAudio = () => {
     if (!audioCtxRef.current) {
@@ -236,19 +219,24 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setHasInteracted(true);
     setIsPlaying(true);
 
-    // 1. Trigger Web Audio Noir Atmosphere instantly (guaranteed to be audible on mobile & Instagram)
-    startAtmosphericSynth();
-
-    // 2. Trigger YouTube Iframe Stream synchronously
-    sendIframeCommand('unMute');
-    sendIframeCommand('setVolume', Math.round(volume * 100));
-    sendIframeCommand('playVideo');
+    // 1. Play HTML5 Audio element directly (100% supported in mobile & Instagram in-app browser)
+    if (audioElementRef.current) {
+      audioElementRef.current.volume = isMuted ? 0 : volume;
+      audioElementRef.current.play().catch(() => {
+        // Fallback to web audio synth chords if local mp3 is not loaded
+        startAtmosphericSynth();
+      });
+    } else {
+      startAtmosphericSynth();
+    }
   };
 
   const pauseAudio = () => {
     setIsPlaying(false);
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+    }
     stopAtmosphericSynth();
-    sendIframeCommand('pauseVideo');
   };
 
   const togglePlay = () => {
@@ -262,24 +250,22 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const toggleMute = () => {
     const nextMute = !isMuted;
     setIsMuted(nextMute);
+    if (audioElementRef.current) {
+      audioElementRef.current.muted = nextMute;
+      audioElementRef.current.volume = nextMute ? 0 : volume;
+    }
     if (synthNodesRef.current.masterGain && audioCtxRef.current) {
       synthNodesRef.current.masterGain.gain.setValueAtTime(nextMute ? 0 : volume * 0.18, audioCtxRef.current.currentTime);
-    }
-    if (nextMute) {
-      sendIframeCommand('mute');
-    } else {
-      sendIframeCommand('unMute');
-      sendIframeCommand('setVolume', Math.round(volume * 100));
     }
   };
 
   const setVolume = (v: number) => {
     setVolumeState(v);
+    if (audioElementRef.current && !isMuted) {
+      audioElementRef.current.volume = v;
+    }
     if (synthNodesRef.current.masterGain && audioCtxRef.current && !isMuted) {
       synthNodesRef.current.masterGain.gain.setValueAtTime(v * 0.18, audioCtxRef.current.currentTime);
-    }
-    if (!isMuted) {
-      sendIframeCommand('setVolume', Math.round(v * 100));
     }
   };
 
@@ -293,8 +279,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
   }, []);
-
-  const videoId = PERSONAL_INFO.audioTrack.youtubeId;
 
   return (
     <AudioContext.Provider
@@ -318,22 +302,17 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     >
       {children}
 
-      {/* Mobile & Instagram In-App Browser Audio Stream */}
-      <div 
-        className={`fixed bottom-2 right-2 z-0 transition-opacity duration-500 ${
-          isPlaying ? 'opacity-[0.05] w-14 h-14' : 'opacity-0 w-0 h-0 overflow-hidden pointer-events-none'
-        }`} 
-        aria-hidden="true"
-      >
-        <iframe
-          ref={iframeRef}
-          id="secret-background-audio-stream"
-          src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=${isPlaying ? 1 : 0}&playsinline=1&enablejsapi=1&controls=0&disablekb=1&loop=1&playlist=${videoId}&modestbranding=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
-          title="After Hours Soundtrack Stream"
-          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-          className="w-full h-full border-0"
-        />
-      </div>
+      {/* HTML5 Direct Audio Stream (Instagram In-App Browser & Mobile Compatible) */}
+      <audio
+        ref={audioElementRef}
+        id="starboy-soundtrack-audio"
+        src={PERSONAL_INFO.audioTrack.audioSrc || "/audio/after-hours.mp3"}
+        loop
+        playsInline
+        preload="auto"
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+      />
 
       {/* Floating Mini Player Widget & Atmosphere Modal */}
       <FloatingAudioBar />
