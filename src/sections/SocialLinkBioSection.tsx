@@ -11,7 +11,9 @@ export const SocialLinkBioSection: React.FC = () => {
 
   const handleCopy = (text: string, label: string) => {
     playClickSound();
-    navigator.clipboard.writeText(text);
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
     setCopiedHandle(label);
     setTimeout(() => setCopiedHandle(null), 2200);
   };

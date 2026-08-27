@@ -310,7 +310,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         loop
         playsInline
         preload="auto"
-        onPlay={() => setIsPlaying(true)}
+        onPlay={() => {
+          setIsPlaying(true);
+          stopAtmosphericSynth();
+        }}
+        onError={() => {
+          if (isPlaying) {
+            startAtmosphericSynth();
+          }
+        }}
         onPause={() => setIsPlaying(false)}
       />
 
