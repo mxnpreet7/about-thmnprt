@@ -55,8 +55,8 @@ export const MusicSection: React.FC = () => {
 
                 {/* Center Label */}
                 <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-tr from-red-800 to-black border-2 border-red-500 flex flex-col items-center justify-center text-center p-1">
-                  <span className="text-[8px] font-mono text-red-300 font-bold uppercase">STARBOY</span>
-                  <span className="text-[7px] text-white/50">THE WEEKND</span>
+                  <span className="text-[8px] font-mono text-red-300 font-bold uppercase">{PERSONAL_INFO.audioTrack.title.toUpperCase()}</span>
+                  <span className="text-[7px] text-white/50">{PERSONAL_INFO.audioTrack.artist.toUpperCase()}</span>
                   <div className="w-2 h-2 rounded-full bg-black mt-1" />
                 </div>
               </div>

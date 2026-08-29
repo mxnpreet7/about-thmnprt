@@ -42,7 +42,7 @@ export const PERSONAL_INFO = {
     title: "blue",
     artist: "Yung Kai",
     youtubeId: "IpFX2vq8HKw",
-    youtubeUrl: "https://youtu.be/IpFX2vq8HKw?si=nODYjQciD3D95wFt",
+    youtubeUrl: "https://youtu.be/IpFX2vq8HKw?si=eM0TedSkrW8dxb7J",
     audioSrc: "/audio/blue.mp3",
     tempo: "78 BPM",
     mood: "Romantic Nostalgia • Dreamy Bedroom Pop • Late Night Reverie"

@@ -44,7 +44,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [showPlayerModal, setShowPlayerModal] = useState<boolean>(false);
   const [isInstagramBrowser, setIsInstagramBrowser] = useState<boolean>(false);
 
-  const ytPlayerRef = useRef<any>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const synthNodesRef = useRef<{
     masterGain?: GainNode;
@@ -76,7 +75,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
-      audioCtxRef.current.resume();
+      audioCtxRef.current.resume().catch(() => {});
     }
   };
 
@@ -210,54 +209,35 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Immediate synchronous play execution on user click/touch & automatic triggers
+  // Immediate synchronous play execution on user click/touch
   const playAudio = () => {
     initWebAudio();
     setHasInteracted(true);
     setIsPlaying(true);
 
-    let played = false;
-
-    // 1. Play YouTube Background Player if ready
-    if (ytPlayerRef.current) {
-      try {
-        if (isMuted) {
-          ytPlayerRef.current.mute();
-        } else {
-          ytPlayerRef.current.unMute();
-          ytPlayerRef.current.setVolume(Math.round(volume * 100));
-        }
-        ytPlayerRef.current.playVideo();
-        played = true;
-      } catch (err) {
-        // Fallback
-      }
-    }
-
-    // 2. Play HTML5 Audio element directly if available
     if (audioElementRef.current) {
+      audioElementRef.current.muted = isMuted;
       audioElementRef.current.volume = isMuted ? 0 : volume;
-      audioElementRef.current.play().then(() => {
-        played = true;
-      }).catch(() => {
-        if (!played) {
-          startAtmosphericSynth();
-        }
-      });
-    } else if (!played) {
+      const playPromise = audioElementRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+            stopAtmosphericSynth();
+          })
+          .catch((err) => {
+            console.warn("Direct HTML5 audio playback deferred or blocked, using atmospheric synth fallback:", err);
+            startAtmosphericSynth();
+            setIsPlaying(true);
+          });
+      }
+    } else {
       startAtmosphericSynth();
     }
   };
 
   const pauseAudio = () => {
     setIsPlaying(false);
-    if (ytPlayerRef.current) {
-      try {
-        ytPlayerRef.current.pauseVideo();
-      } catch (err) {
-        // Ignore
-      }
-    }
     if (audioElementRef.current) {
       audioElementRef.current.pause();
     }
@@ -275,18 +255,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const toggleMute = () => {
     const nextMute = !isMuted;
     setIsMuted(nextMute);
-    if (ytPlayerRef.current) {
-      try {
-        if (nextMute) {
-          ytPlayerRef.current.mute();
-        } else {
-          ytPlayerRef.current.unMute();
-          ytPlayerRef.current.setVolume(Math.round(volume * 100));
-        }
-      } catch {
-        // Ignore
-      }
-    }
     if (audioElementRef.current) {
       audioElementRef.current.muted = nextMute;
       audioElementRef.current.volume = nextMute ? 0 : volume;
@@ -298,13 +266,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setVolume = (v: number) => {
     setVolumeState(v);
-    if (ytPlayerRef.current && !isMuted) {
-      try {
-        ytPlayerRef.current.setVolume(Math.round(v * 100));
-      } catch {
-        // Ignore
-      }
-    }
     if (audioElementRef.current && !isMuted) {
       audioElementRef.current.volume = v;
     }
@@ -313,105 +274,38 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Initialize YouTube Iframe API for background soundtrack
+  // Pre-load audio on mount and unlock on first user gesture for Instagram browser & mobile
   useEffect(() => {
-    const loadYT = () => {
-      if (typeof window === 'undefined') return;
+    const audio = audioElementRef.current;
+    if (audio) {
+      audio.load();
+    }
 
-      const initPlayer = () => {
-        if (window.YT && window.YT.Player) {
-          try {
-            ytPlayerRef.current = new window.YT.Player('youtube-bg-stream-player', {
-              videoId: PERSONAL_INFO.audioTrack.youtubeId,
-              playerVars: {
-                autoplay: 1,
-                controls: 0,
-                disablekb: 1,
-                fs: 0,
-                loop: 1,
-                playlist: PERSONAL_INFO.audioTrack.youtubeId,
-                playsinline: 1,
-                modestbranding: 1,
-                rel: 0,
-                enablejsapi: 1,
-                origin: window.location.origin
-              },
-              events: {
-                onReady: (event: any) => {
-                  ytPlayerRef.current = event.target;
-                  if (isMuted) {
-                    event.target.mute();
-                  } else {
-                    event.target.unMute();
-                    event.target.setVolume(Math.round(volume * 100));
-                  }
-                  // Automatic playback trigger on ready
-                  try {
-                    event.target.playVideo();
-                  } catch {
-                    // Requires interaction
-                  }
-                },
-                onStateChange: (event: any) => {
-                  if (event.data === 1) { // PLAYING
-                    setIsPlaying(true);
-                  } else if (event.data === 2) { // PAUSED
-                    setIsPlaying(false);
-                  }
-                }
-              }
-            });
-          } catch (e) {
-            // Player init fallback
-          }
-        }
-      };
-
-      if (!window.YT) {
-        const tag = document.createElement('script');
-        tag.src = 'https://www.youtube.com/iframe_api';
-        tag.id = 'yt-iframe-api-script';
-        const firstScript = document.getElementsByTagName('script')[0];
-        firstScript?.parentNode?.insertBefore(tag, firstScript);
-        window.onYouTubeIframeAPIReady = initPlayer;
-      } else {
-        initPlayer();
-      }
-    };
-
-    loadYT();
-  }, []);
-
-  // Automatic audio playback on mount & on first touch/interaction (for Instagram in-app WebView & mobile)
-  useEffect(() => {
-    // 1. Attempt autoplay on load
-    const timeout = setTimeout(() => {
-      try {
-        playAudio();
-      } catch {
-        // Autoplay blocked without gesture
-      }
-    }, 500);
-
-    // 2. Global one-time interaction listener on any touch, click, scroll or keydown
+    // Global one-time interaction listener on any touch, click, scroll or keydown
     const handleFirstActivation = () => {
       setHasInteracted(true);
-      playAudio();
+      initWebAudio();
+      if (audioElementRef.current && audioElementRef.current.paused) {
+        audioElementRef.current.muted = isMuted;
+        audioElementRef.current.volume = isMuted ? 0 : volume;
+        audioElementRef.current.play().then(() => {
+          setIsPlaying(true);
+        }).catch(() => {});
+      }
       cleanupListeners();
     };
 
     const cleanupListeners = () => {
-      ['click', 'touchstart', 'touchend', 'pointerdown', 'scroll', 'keydown'].forEach(event => {
+      ['click', 'touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(event => {
         window.removeEventListener(event, handleFirstActivation);
       });
     };
 
-    ['click', 'touchstart', 'touchend', 'pointerdown', 'scroll', 'keydown'].forEach(event => {
-      window.addEventListener(event, handleFirstActivation, { passive: true });
+    ['click', 'touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(event => {
+      window.addEventListener(event, handleFirstActivation, { passive: true, once: true });
     });
 
     return () => {
-      clearTimeout(timeout);
       cleanupListeners();
       try {
         stopAtmosphericSynth();
@@ -444,16 +338,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     >
       {children}
 
-      {/* Hidden YouTube Background Audio Stream */}
-      <div 
-        id="youtube-bg-stream-container" 
-        className="fixed -bottom-96 -right-96 w-1 h-1 opacity-0 pointer-events-none overflow-hidden"
-        aria-hidden="true"
-      >
-        <div id="youtube-bg-stream-player" />
-      </div>
-
-      {/* HTML5 Direct Audio Stream Fallback */}
+      {/* HTML5 Direct Audio Stream (Primary Engine) */}
       <audio
         ref={audioElementRef}
         id="starboy-soundtrack-audio"
@@ -466,7 +351,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           stopAtmosphericSynth();
         }}
         onError={() => {
-          if (isPlaying && !ytPlayerRef.current) {
+          if (isPlaying) {
             startAtmosphericSynth();
           }
         }}

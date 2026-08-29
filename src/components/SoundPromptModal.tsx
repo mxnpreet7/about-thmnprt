@@ -62,6 +62,7 @@ export const SoundPromptModal: React.FC<SoundPromptModalProps> = ({ onDismiss })
           <button
             id="btn-sound-prompt-enter-with-audio"
             onClick={handleEnterWithSound}
+            onTouchEnd={handleEnterWithSound}
             className="w-full py-3.5 px-6 rounded-2xl bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-mono text-xs font-bold tracking-widest uppercase transition-all shadow-lg shadow-red-600/30 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer select-none"
           >
             <Volume2 className="w-4 h-4" />
@@ -71,6 +72,7 @@ export const SoundPromptModal: React.FC<SoundPromptModalProps> = ({ onDismiss })
           <button
             id="btn-sound-prompt-enter-muted"
             onClick={handleEnterMuted}
+            onTouchEnd={handleEnterMuted}
             className="w-full py-3 px-6 rounded-2xl bg-white/5 hover:bg-white/10 active:bg-white/15 text-white/60 hover:text-white font-mono text-xs tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer select-none"
           >
             <VolumeX className="w-4 h-4" />
