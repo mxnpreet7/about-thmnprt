@@ -39,13 +39,13 @@ export const PERSONAL_INFO = {
   primaryColor: "#000000",
   accentColor: "#DC2626", // Deep Crimson Red
   audioTrack: {
-    title: "After Hours",
-    artist: "The Weeknd",
-    youtubeId: "sI3FS119zNI",
-    youtubeUrl: "https://youtu.be/sI3FS119zNI?si=zWrFaispcuN1YGyH",
-    audioSrc: "/audio/after-hours.mp3",
-    tempo: "109 BPM",
-    mood: "Late Night Noir • Melancholic Drive • Cinematic Heartbreak"
+    title: "blue",
+    artist: "Yung Kai",
+    youtubeId: "IpFX2vq8HKw",
+    youtubeUrl: "https://youtu.be/IpFX2vq8HKw?si=nODYjQciD3D95wFt",
+    audioSrc: "/audio/blue.mp3",
+    tempo: "78 BPM",
+    mood: "Romantic Nostalgia • Dreamy Bedroom Pop • Late Night Reverie"
   }
 };
 

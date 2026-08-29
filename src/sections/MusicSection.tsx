@@ -107,7 +107,7 @@ export const MusicSection: React.FC = () => {
             </div>
 
             <p className="mt-4 text-xs sm:text-sm text-neutral-300 font-body leading-relaxed">
-              The signature track powering the noir atmosphere. A blend of atmospheric sub-bass, hypnotic noir synthesizers, and Abel's raw nocturnal lyricism. The definitive soundtrack for late-night autonomy and cinematic drives.
+              The signature track powering the atmosphere. A dreamy, romantic blend of gentle indie chords, warm bedroom-pop melancholy, and Yung Kai's soothing late-night vocals.
             </p>
 
             {/* Sound Waveform Visualization */}

@@ -44,7 +44,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [showPlayerModal, setShowPlayerModal] = useState<boolean>(false);
   const [isInstagramBrowser, setIsInstagramBrowser] = useState<boolean>(false);
 
-  // Web Audio context for bulletproof instant playback across all mobile browsers & WebViews
+  const ytPlayerRef = useRef<any>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const synthNodesRef = useRef<{
     masterGain?: GainNode;
@@ -80,29 +80,28 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Dark atmospheric synth chords for The Weeknd "After Hours" mood (G minor - Eb - F - Dm)
+  // Dreamy lofi synth chord progression for Yung Kai "blue" (Dmaj7 - Bm7 - Gmaj7 - A7)
   const startAtmosphericSynth = () => {
     try {
       initWebAudio();
       if (!audioCtxRef.current) return;
       const ctx = audioCtxRef.current;
 
-      // Stop previous synth if any
       stopAtmosphericSynth();
 
       const masterGain = ctx.createGain();
-      masterGain.gain.setValueAtTime(isMuted ? 0 : volume * 0.18, ctx.currentTime);
+      masterGain.gain.setValueAtTime(isMuted ? 0 : volume * 0.16, ctx.currentTime);
 
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(480, ctx.currentTime);
+      filter.frequency.setValueAtTime(420, ctx.currentTime);
 
-      // Chords sequence: Gm -> Eb -> F -> Dm
+      // Chords sequence: Dmaj7 -> Bm7 -> Gmaj7 -> A
       const chordFrequencies = [
-        [98.0, 146.83, 174.61], // G2, D3, F3 (Gm7)
-        [77.78, 155.56, 196.0],  // Eb2, Eb3, G3 (Ebmaj7)
-        [87.31, 130.81, 174.61], // F2, C3, F3 (F)
-        [73.42, 146.83, 174.61]  // D2, D3, F3 (Dm)
+        [73.42, 146.83, 185.00, 220.00], // D2, D3, F#3, A3
+        [61.74, 123.47, 146.83, 185.00], // B1, B2, D3, F#3
+        [98.00, 146.83, 196.00, 246.94], // G2, D3, G3, B3
+        [110.00, 164.81, 220.00, 277.18] // A2, E3, A3, C#4
       ];
 
       let currentChordIndex = 0;
@@ -115,13 +114,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const oscGain = ctx.createGain();
           osc.type = 'sine';
           osc.frequency.setValueAtTime(freq, now);
-
-          // Subtle detune for rich noir warmth
-          osc.detune.setValueAtTime(Math.random() * 6 - 3, now);
+          osc.detune.setValueAtTime(Math.random() * 4 - 2, now);
 
           oscGain.gain.setValueAtTime(0.001, now);
-          oscGain.gain.exponentialRampToValueAtTime(0.08, now + 1.2);
-          oscGain.gain.exponentialRampToValueAtTime(0.001, now + 5.8);
+          oscGain.gain.exponentialRampToValueAtTime(0.06, now + 1.4);
+          oscGain.gain.exponentialRampToValueAtTime(0.001, now + 5.6);
 
           osc.connect(oscGain);
           oscGain.connect(filter);
@@ -139,7 +136,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const intervalId = setInterval(() => {
         currentChordIndex = (currentChordIndex + 1) % chordFrequencies.length;
         playChord(chordFrequencies[currentChordIndex]);
-      }, 5500);
+      }, 5200);
 
       synthNodesRef.current = {
         masterGain,
@@ -213,26 +210,54 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Immediate synchronous play execution on user click/touch
+  // Immediate synchronous play execution on user click/touch & automatic triggers
   const playAudio = () => {
     initWebAudio();
     setHasInteracted(true);
     setIsPlaying(true);
 
-    // 1. Play HTML5 Audio element directly (100% supported in mobile & Instagram in-app browser)
+    let played = false;
+
+    // 1. Play YouTube Background Player if ready
+    if (ytPlayerRef.current) {
+      try {
+        if (isMuted) {
+          ytPlayerRef.current.mute();
+        } else {
+          ytPlayerRef.current.unMute();
+          ytPlayerRef.current.setVolume(Math.round(volume * 100));
+        }
+        ytPlayerRef.current.playVideo();
+        played = true;
+      } catch (err) {
+        // Fallback
+      }
+    }
+
+    // 2. Play HTML5 Audio element directly if available
     if (audioElementRef.current) {
       audioElementRef.current.volume = isMuted ? 0 : volume;
-      audioElementRef.current.play().catch(() => {
-        // Fallback to web audio synth chords if local mp3 is not loaded
-        startAtmosphericSynth();
+      audioElementRef.current.play().then(() => {
+        played = true;
+      }).catch(() => {
+        if (!played) {
+          startAtmosphericSynth();
+        }
       });
-    } else {
+    } else if (!played) {
       startAtmosphericSynth();
     }
   };
 
   const pauseAudio = () => {
     setIsPlaying(false);
+    if (ytPlayerRef.current) {
+      try {
+        ytPlayerRef.current.pauseVideo();
+      } catch (err) {
+        // Ignore
+      }
+    }
     if (audioElementRef.current) {
       audioElementRef.current.pause();
     }
@@ -250,27 +275,144 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const toggleMute = () => {
     const nextMute = !isMuted;
     setIsMuted(nextMute);
+    if (ytPlayerRef.current) {
+      try {
+        if (nextMute) {
+          ytPlayerRef.current.mute();
+        } else {
+          ytPlayerRef.current.unMute();
+          ytPlayerRef.current.setVolume(Math.round(volume * 100));
+        }
+      } catch {
+        // Ignore
+      }
+    }
     if (audioElementRef.current) {
       audioElementRef.current.muted = nextMute;
       audioElementRef.current.volume = nextMute ? 0 : volume;
     }
     if (synthNodesRef.current.masterGain && audioCtxRef.current) {
-      synthNodesRef.current.masterGain.gain.setValueAtTime(nextMute ? 0 : volume * 0.18, audioCtxRef.current.currentTime);
+      synthNodesRef.current.masterGain.gain.setValueAtTime(nextMute ? 0 : volume * 0.16, audioCtxRef.current.currentTime);
     }
   };
 
   const setVolume = (v: number) => {
     setVolumeState(v);
+    if (ytPlayerRef.current && !isMuted) {
+      try {
+        ytPlayerRef.current.setVolume(Math.round(v * 100));
+      } catch {
+        // Ignore
+      }
+    }
     if (audioElementRef.current && !isMuted) {
       audioElementRef.current.volume = v;
     }
     if (synthNodesRef.current.masterGain && audioCtxRef.current && !isMuted) {
-      synthNodesRef.current.masterGain.gain.setValueAtTime(v * 0.18, audioCtxRef.current.currentTime);
+      synthNodesRef.current.masterGain.gain.setValueAtTime(v * 0.16, audioCtxRef.current.currentTime);
     }
   };
 
+  // Initialize YouTube Iframe API for background soundtrack
   useEffect(() => {
+    const loadYT = () => {
+      if (typeof window === 'undefined') return;
+
+      const initPlayer = () => {
+        if (window.YT && window.YT.Player) {
+          try {
+            ytPlayerRef.current = new window.YT.Player('youtube-bg-stream-player', {
+              videoId: PERSONAL_INFO.audioTrack.youtubeId,
+              playerVars: {
+                autoplay: 1,
+                controls: 0,
+                disablekb: 1,
+                fs: 0,
+                loop: 1,
+                playlist: PERSONAL_INFO.audioTrack.youtubeId,
+                playsinline: 1,
+                modestbranding: 1,
+                rel: 0,
+                enablejsapi: 1,
+                origin: window.location.origin
+              },
+              events: {
+                onReady: (event: any) => {
+                  ytPlayerRef.current = event.target;
+                  if (isMuted) {
+                    event.target.mute();
+                  } else {
+                    event.target.unMute();
+                    event.target.setVolume(Math.round(volume * 100));
+                  }
+                  // Automatic playback trigger on ready
+                  try {
+                    event.target.playVideo();
+                  } catch {
+                    // Requires interaction
+                  }
+                },
+                onStateChange: (event: any) => {
+                  if (event.data === 1) { // PLAYING
+                    setIsPlaying(true);
+                  } else if (event.data === 2) { // PAUSED
+                    setIsPlaying(false);
+                  }
+                }
+              }
+            });
+          } catch (e) {
+            // Player init fallback
+          }
+        }
+      };
+
+      if (!window.YT) {
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        tag.id = 'yt-iframe-api-script';
+        const firstScript = document.getElementsByTagName('script')[0];
+        firstScript?.parentNode?.insertBefore(tag, firstScript);
+        window.onYouTubeIframeAPIReady = initPlayer;
+      } else {
+        initPlayer();
+      }
+    };
+
+    loadYT();
+  }, []);
+
+  // Automatic audio playback on mount & on first touch/interaction (for Instagram in-app WebView & mobile)
+  useEffect(() => {
+    // 1. Attempt autoplay on load
+    const timeout = setTimeout(() => {
+      try {
+        playAudio();
+      } catch {
+        // Autoplay blocked without gesture
+      }
+    }, 500);
+
+    // 2. Global one-time interaction listener on any touch, click, scroll or keydown
+    const handleFirstActivation = () => {
+      setHasInteracted(true);
+      playAudio();
+      cleanupListeners();
+    };
+
+    const cleanupListeners = () => {
+      ['click', 'touchstart', 'touchend', 'pointerdown', 'scroll', 'keydown'].forEach(event => {
+        window.removeEventListener(event, handleFirstActivation);
+      });
+    };
+
+    ['click', 'touchstart', 'touchend', 'pointerdown', 'scroll', 'keydown'].forEach(event => {
+      window.addEventListener(event, handleFirstActivation, { passive: true });
+    });
+
     return () => {
+      clearTimeout(timeout);
+      cleanupListeners();
       try {
         stopAtmosphericSynth();
         audioCtxRef.current?.close();
@@ -302,11 +444,20 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     >
       {children}
 
-      {/* HTML5 Direct Audio Stream (Instagram In-App Browser & Mobile Compatible) */}
+      {/* Hidden YouTube Background Audio Stream */}
+      <div 
+        id="youtube-bg-stream-container" 
+        className="fixed -bottom-96 -right-96 w-1 h-1 opacity-0 pointer-events-none overflow-hidden"
+        aria-hidden="true"
+      >
+        <div id="youtube-bg-stream-player" />
+      </div>
+
+      {/* HTML5 Direct Audio Stream Fallback */}
       <audio
         ref={audioElementRef}
         id="starboy-soundtrack-audio"
-        src={PERSONAL_INFO.audioTrack.audioSrc || "/audio/after-hours.mp3"}
+        src={PERSONAL_INFO.audioTrack.audioSrc || "/audio/blue.mp3"}
         loop
         playsInline
         preload="auto"
@@ -315,7 +466,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           stopAtmosphericSynth();
         }}
         onError={() => {
-          if (isPlaying) {
+          if (isPlaying && !ytPlayerRef.current) {
             startAtmosphericSynth();
           }
         }}
@@ -324,7 +475,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       {/* Floating Mini Player Widget & Atmosphere Modal */}
       <FloatingAudioBar />
-      {showPlayerModal && <AfterHoursAudioModal onClose={() => setShowPlayerModal(false)} />}
+      {showPlayerModal && <TrackAudioModal onClose={() => setShowPlayerModal(false)} />}
     </AudioContext.Provider>
   );
 };
@@ -343,7 +494,7 @@ const FloatingAudioBar: React.FC = () => {
         id="btn-toggle-vinyl-play"
         onClick={togglePlay}
         className="flex items-center gap-2 group cursor-pointer focus:outline-none"
-        title={isPlaying ? "Pause After Hours Soundtrack" : "Play After Hours Soundtrack"}
+        title={isPlaying ? `Pause ${PERSONAL_INFO.audioTrack.title} Soundtrack` : `Play ${PERSONAL_INFO.audioTrack.title} Soundtrack`}
       >
         <Disc3
           className={`w-5 h-5 text-red-500 transition-transform duration-700 ${
@@ -352,7 +503,7 @@ const FloatingAudioBar: React.FC = () => {
         />
         <div className="flex flex-col text-left">
           <span className="text-[10px] sm:text-[11px] font-semibold text-white/90 uppercase tracking-widest font-case flex items-center gap-1">
-            <span>AFTER HOURS</span>
+            <span>{PERSONAL_INFO.audioTrack.title.toUpperCase()}</span>
             {isInstagramBrowser && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
           </span>
           <span className="text-[8px] sm:text-[9px] text-white/50 tracking-wider">
@@ -414,10 +565,10 @@ const FloatingAudioBar: React.FC = () => {
   );
 };
 
-// Official The Weeknd — After Hours Video/Embed Modal
-const AfterHoursAudioModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+// Official Yung Kai — blue Video/Embed Modal
+const TrackAudioModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   return (
-    <div id="modal-afterhours-player" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+    <div id="modal-track-player" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
       <div className="relative w-full max-w-2xl bg-[#0B0B0E] border border-red-500/30 rounded-2xl p-5 sm:p-6 shadow-2xl overflow-hidden">
         {/* Background glow */}
         <div className="absolute -top-20 -right-20 w-52 h-52 bg-red-600/20 rounded-full blur-3xl pointer-events-none" />
@@ -428,11 +579,11 @@ const AfterHoursAudioModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
               SIGNATURE SOUNDTRACK ARCHIVE
             </div>
             <h3 className="text-lg sm:text-xl font-bold font-display text-white mt-0.5">
-              The Weeknd — After Hours
+              {PERSONAL_INFO.audioTrack.artist} — {PERSONAL_INFO.audioTrack.title}
             </h3>
           </div>
           <button
-            id="btn-close-afterhours-modal"
+            id="btn-close-track-modal"
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
           >
@@ -444,7 +595,7 @@ const AfterHoursAudioModal: React.FC<{ onClose: () => void }> = ({ onClose }) =>
           <iframe
             className="w-full h-full"
             src={`https://www.youtube-nocookie.com/embed/${PERSONAL_INFO.audioTrack.youtubeId}?autoplay=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1`}
-            title="The Weeknd - After Hours"
+            title={`${PERSONAL_INFO.audioTrack.artist} - ${PERSONAL_INFO.audioTrack.title}`}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
             allowFullScreen
           />

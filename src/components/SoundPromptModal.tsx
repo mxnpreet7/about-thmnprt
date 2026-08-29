@@ -1,7 +1,8 @@
 import React from 'react';
-import { Volume2, VolumeX, Sparkles, Disc, Radio } from 'lucide-react';
+import { Volume2, VolumeX, Sparkles, Disc, Radio, Music } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAudio } from './AudioEngine';
+import { PERSONAL_INFO } from '../data/personalData';
 
 interface SoundPromptModalProps {
   onDismiss: () => void;
@@ -52,8 +53,8 @@ export const SoundPromptModal: React.FC<SoundPromptModalProps> = ({ onDismiss })
 
         <p className="mt-3 text-xs sm:text-sm text-neutral-300 font-body leading-relaxed">
           {isInstagramBrowser
-            ? "Optimized for Instagram Bio view. Tap below to start the atmospheric soundtrack."
-            : "For the optimal experience, explore with the official signature soundtrack."}
+            ? `Optimized for Instagram Bio view. Tap below to start playing "${PERSONAL_INFO.audioTrack.title}" by ${PERSONAL_INFO.audioTrack.artist}.`
+            : `For the best experience, explore with the official signature soundtrack: "${PERSONAL_INFO.audioTrack.title}" by ${PERSONAL_INFO.audioTrack.artist}.`}
         </p>
 
         {/* Buttons */}
@@ -64,7 +65,7 @@ export const SoundPromptModal: React.FC<SoundPromptModalProps> = ({ onDismiss })
             className="w-full py-3.5 px-6 rounded-2xl bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-mono text-xs font-bold tracking-widest uppercase transition-all shadow-lg shadow-red-600/30 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer select-none"
           >
             <Volume2 className="w-4 h-4" />
-            <span>PLAY AFTER HOURS SOUNDTRACK</span>
+            <span>PLAY "{PERSONAL_INFO.audioTrack.title.toUpperCase()}" — {PERSONAL_INFO.audioTrack.artist.toUpperCase()}</span>
           </button>
 
           <button
